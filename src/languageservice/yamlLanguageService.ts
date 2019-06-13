@@ -12,7 +12,8 @@ import { YAMLCompletion } from './services/yamlCompletion';
 import { YAMLHover } from './services/yamlHover';
 import { YAMLValidation } from './services/yamlValidation';
 import { YAMLFormatter } from './services/yamlFormatter';
-import { LanguageService as JSONLanguageService, getLanguageService as getJSONLanguageService, JSONWorkerContribution } from 'vscode-json-languageservice';
+import { getLanguageService as getJSONLanguageService, JSONWorkerContribution } from 'vscode-json-languageservice';
+import { SchemaModification, SchemaAdditions, SchemaDeletions } from './apis/schemaModification';
 
 export interface LanguageSettings {
   validate?: boolean; //Setting for whether we want to validate the schema
@@ -118,6 +119,10 @@ export interface LanguageService {
   doResolve(completionItem): Thenable<CompletionItem>;
   resetSchema(uri: string): boolean;
   doFormat(document: TextDocument, options: CustomFormatterOptions): TextEdit[];
+  addSchema(schemaID: string, schema: JSONSchema): void;
+  deleteSchema(schemaID: string): void;
+  modifySchemaContent(schemaAdditions: SchemaAdditions): void;
+  deleteSchemaContent(schemaDeletions: SchemaDeletions): void;
 }
 
 export function getLanguageService(schemaRequestService: SchemaRequestService,
@@ -136,6 +141,7 @@ export function getLanguageService(schemaRequestService: SchemaRequestService,
   const yamlDocumentSymbols = new YAMLDocumentSymbols(jsonLanguageService);
   const yamlValidation = new YAMLValidation(promise, jsonLanguageService);
   const formatter = new YAMLFormatter();
+  const schemaModifier = new SchemaModification();
 
   return {
         configure: settings => {
@@ -165,7 +171,10 @@ export function getLanguageService(schemaRequestService: SchemaRequestService,
           jsonLanguageService.resetSchema(uri);
           return  schemaService.onResourceChange(uri);
       },
-
-      doFormat: formatter.format.bind(formatter)
+      doFormat: formatter.format.bind(formatter),
+      addSchema: (schemaID: string, schema: JSONSchema) => schemaService.saveSchema(schemaID, schema),
+      deleteSchema: (schemaID: string) => schemaService.deleteSchema(schemaID),
+      modifySchemaContent: (schemaAdditions: SchemaAdditions) => schemaModifier.addContent(schemaService, schemaAdditions),
+      deleteSchemaContent: (schemaDeletions: SchemaDeletions) => schemaModifier.deleteContent(schemaService, schemaDeletions)
   };
 }
